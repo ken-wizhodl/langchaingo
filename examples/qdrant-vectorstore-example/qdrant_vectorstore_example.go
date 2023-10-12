@@ -108,7 +108,8 @@ func main() {
 	fmt.Println(docs)
 
 	// Search for similar documents using score threshold and metadata filter.
-	filter := qdrant.NewMustEqualFilter("country", "Brizil")
+	filter := store.NewMustEqualFilter("country", "Brazil")
+	fmt.Println(filter)
 
 	docs, err = store.SimilaritySearch(ctx, "name has Paulo",
 		10,

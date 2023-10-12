@@ -3,6 +3,7 @@ package qdrant
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/schema"
@@ -31,8 +32,9 @@ type Store struct {
 	useCloud       bool
 	apiKey         string
 	baseURL        string
-	textKey        string
 	collectionName string
+	contentKey     string
+	metadataKey    string
 }
 
 var _ vectorstores.VectorStore = Store{}
@@ -66,16 +68,10 @@ func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options
 
 	metadatas := make([]map[string]any, 0, len(docs))
 	for i := 0; i < len(docs); i++ {
-		metadata := make(map[string]any, len(docs[i].Metadata))
-		for key, value := range docs[i].Metadata {
-			metadata[key] = value
-		}
-		metadata[s.textKey] = texts[i]
-
-		metadatas = append(metadatas, metadata)
+		metadatas = append(metadatas, docs[i].Metadata)
 	}
 
-	return s.restUpsert(ctx, vectors, metadatas, s.collectionName)
+	return s.restUpsert(ctx, texts, vectors, metadatas, s.collectionName)
 }
 
 // SimilaritySearch creates a vector embedding from the query using the embedder
@@ -127,11 +123,11 @@ func (s Store) getOptions(options ...vectorstores.Option) vectorstores.Options {
 	return opts
 }
 
-func NewMustEqualFilter(key string, values ...string) any {
+func (s Store) NewMustEqualFilter(key string, values ...string) any {
 	return map[string]any{
 		"must": []any{
 			map[string]any{
-				"key": key,
+				"key": fmt.Sprintf("%s.%s", s.metadataKey, key),
 				"match": map[string]any{
 					"any": values,
 				},

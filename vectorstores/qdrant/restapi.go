@@ -46,6 +46,7 @@ type upsertPayload struct {
 
 func (s Store) restUpsert(
 	ctx context.Context,
+	texts []string,
 	vectors [][]float32,
 	metadatas []map[string]any,
 	collection string,
@@ -54,7 +55,7 @@ func (s Store) restUpsert(
 	for i := 0; i < len(vectors); i++ {
 		v = append(v, point{
 			Vector:  vectors[i],
-			Payload: metadatas[i],
+			Payload: map[string]any{s.contentKey: texts[i], s.metadataKey: metadatas[i]},
 			ID:      uuid.New().String(),
 		})
 	}
@@ -154,15 +155,14 @@ func (s Store) restQuery(
 
 	docs := make([]schema.Document, 0, len(response.Result))
 	for _, spoint := range response.Result {
-		pageContent, ok := spoint.Payload[s.textKey].(string)
+		pageContent, ok := spoint.Payload[s.contentKey].(string)
 		if !ok {
 			return nil, ErrMissingTextKey
 		}
-		delete(spoint.Payload, s.textKey)
 
 		doc := schema.Document{
 			PageContent: pageContent,
-			Metadata:    spoint.Payload,
+			Metadata:    spoint.Payload[s.metadataKey].(map[string]any),
 			Score:       spoint.Score,
 		}
 

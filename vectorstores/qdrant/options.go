@@ -11,7 +11,8 @@ import (
 const (
 	_qdrantKeyEnvVarName = "QDRANT_API_KEY"
 	_qdrantURLEnvVarName = "QDRANT_BASE_URL"
-	_defaultTextKey      = "text"
+	_defaultContentKey   = "page_content"
+	_defaultMetadataKey  = "metadata"
 )
 
 // ErrInvalidOptions is returned when the options given are invalid.
@@ -24,6 +25,20 @@ type Option func(p *Store)
 func WithEmbedder(e embeddings.Embedder) Option {
 	return func(p *Store) {
 		p.embedder = e
+	}
+}
+
+// WithContentKey is an option for setting the key name of the content.
+func WithContentKey(contentKey string) Option {
+	return func(p *Store) {
+		p.contentKey = contentKey
+	}
+}
+
+// WithMetadataKey is an option for setting the key name of the meta data.
+func WithMetadataKey(metadataKey string) Option {
+	return func(p *Store) {
+		p.metadataKey = metadataKey
 	}
 }
 
@@ -52,14 +67,6 @@ func WithUseCloud(isCloud bool) Option {
 	}
 }
 
-// WithTextKey is an option for setting the text key in the metadata to the vectors
-// in the index. The text key stores the text of the document the vector represents.
-func WithTextKey(textKey string) Option {
-	return func(p *Store) {
-		p.textKey = textKey
-	}
-}
-
 // NameSpace is an option for setting the nameSpace to upsert and query the vectors
 // from. Must be set.
 func WithCollectionName(collectionName string) Option {
@@ -70,7 +77,8 @@ func WithCollectionName(collectionName string) Option {
 
 func applyClientOptions(opts ...Option) (Store, error) {
 	o := &Store{
-		textKey: _defaultTextKey,
+		contentKey:  _defaultContentKey,
+		metadataKey: _defaultMetadataKey,
 	}
 
 	for _, opt := range opts {
