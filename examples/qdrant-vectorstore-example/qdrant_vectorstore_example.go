@@ -32,6 +32,7 @@ func main() {
 		ctx,
 		qdrant.WithEmbedder(e),
 		qdrant.WithCollectionName("cities"),
+		qdrant.WithIndexKeys([]string{"country"}),
 	)
 	if err != nil {
 		log.Fatal(err)

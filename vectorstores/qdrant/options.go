@@ -15,6 +15,21 @@ const (
 	_defaultMetadataKey  = "metadata"
 )
 
+var _defaultCollectionConfig = map[string]any{
+	"hnsw_config": map[string]any{
+		"payload_m": 16,
+		"m":         0,
+	},
+	"optimizers_config": map[string]any{
+		"memmap_threshold": 10000,
+	},
+	"vectors": map[string]any{
+		"size":     1536,
+		"distance": "Cosine",
+	},
+	"on_disk_payload": true,
+}
+
 // ErrInvalidOptions is returned when the options given are invalid.
 var ErrInvalidOptions = errors.New("invalid options")
 
@@ -25,6 +40,12 @@ type Option func(p *Store)
 func WithEmbedder(e embeddings.Embedder) Option {
 	return func(p *Store) {
 		p.embedder = e
+	}
+}
+
+func WithCollectionConfig(config map[string]any) Option {
+	return func(p *Store) {
+		p.collectionConfig = config
 	}
 }
 
@@ -39,6 +60,12 @@ func WithContentKey(contentKey string) Option {
 func WithMetadataKey(metadataKey string) Option {
 	return func(p *Store) {
 		p.metadataKey = metadataKey
+	}
+}
+
+func WithIndexKeys(indexKeys []string) Option {
+	return func(p *Store) {
+		p.indexKeys = indexKeys
 	}
 }
 
@@ -77,8 +104,9 @@ func WithCollectionName(collectionName string) Option {
 
 func applyClientOptions(opts ...Option) (Store, error) {
 	o := &Store{
-		contentKey:  _defaultContentKey,
-		metadataKey: _defaultMetadataKey,
+		contentKey:       _defaultContentKey,
+		metadataKey:      _defaultMetadataKey,
+		collectionConfig: _defaultCollectionConfig,
 	}
 
 	for _, opt := range opts {

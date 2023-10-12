@@ -29,12 +29,14 @@ var (
 type Store struct {
 	embedder embeddings.Embedder
 
-	useCloud       bool
-	apiKey         string
-	baseURL        string
-	collectionName string
-	contentKey     string
-	metadataKey    string
+	useCloud         bool
+	apiKey           string
+	baseURL          string
+	collectionName   string
+	contentKey       string
+	metadataKey      string
+	indexKeys        []string
+	collectionConfig map[string]any
 }
 
 var _ vectorstores.VectorStore = Store{}
@@ -46,6 +48,12 @@ func New(ctx context.Context, opts ...Option) (Store, error) {
 	if err != nil {
 		return Store{}, err
 	}
+
+	s.restNewCollection(ctx, s.collectionName)
+	for _, indexKey := range s.indexKeys {
+		s.restIndexMetadataKey(ctx, s.collectionName, indexKey)
+	}
+
 	return s, nil
 }
 

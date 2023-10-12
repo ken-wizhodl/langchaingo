@@ -107,6 +107,56 @@ type queryPayload struct {
 	ScoreThreshold float32   `json:"score_threshold"`
 }
 
+func (s Store) restNewCollection(ctx context.Context, collection string) error {
+	endpoint := getEndpoint(s.baseURL, collection, "")
+	config := map[string]any{}
+	for k, v := range s.collectionConfig {
+		config[k] = v
+	}
+	config["name"] = collection
+	body, status, err := doRequest(
+		ctx,
+		config,
+		endpoint,
+		s.apiKey,
+		http.MethodPut,
+	)
+	if err != nil {
+		return err
+	}
+	defer body.Close()
+
+	if status == http.StatusOK {
+		return nil
+	}
+
+	return newAPIError("creating collection", body)
+}
+
+func (s Store) restIndexMetadataKey(ctx context.Context, collection, key string) error {
+	endpoint := getEndpoint(s.baseURL, collection, "/index")
+	body, status, err := doRequest(
+		ctx,
+		map[string]string{
+			"field_name":   key,
+			"field_schema": "keyword",
+		},
+		endpoint,
+		s.apiKey,
+		http.MethodPut,
+	)
+	if err != nil {
+		return err
+	}
+	defer body.Close()
+
+	if status == http.StatusOK {
+		return nil
+	}
+
+	return newAPIError("indexing metadata key", body)
+}
+
 func (s Store) restQuery(
 	ctx context.Context,
 	vector []float32,
@@ -201,9 +251,11 @@ func doRequest(ctx context.Context, payload any, url, apiKey, method string) (io
 }
 
 func getEndpoint(baseURL, collection, path string) string {
-	path = strings.TrimPrefix(path, "/")
+	if path != "" && !strings.HasPrefix(path, "/") {
+		path = fmt.Sprintf("/%s", path)
+	}
 	return fmt.Sprintf(
-		"%s/collections/%s/%s",
+		"%s/collections/%s%s",
 		baseURL,
 		collection,
 		path,
