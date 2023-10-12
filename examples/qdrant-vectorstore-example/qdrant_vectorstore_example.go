@@ -7,6 +7,7 @@ import (
 
 	em_openai "github.com/tmc/langchaingo/embeddings/openai"
 	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/tmc/langchaingo/schema"
 	"github.com/tmc/langchaingo/vectorstores"
 	"github.com/tmc/langchaingo/vectorstores/qdrant"
 )
@@ -36,7 +37,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	Add documents to the Pinecone vector store.
 	err = store.AddDocuments(context.Background(), []schema.Document{
 		{
 			PageContent: "Tokyo",
