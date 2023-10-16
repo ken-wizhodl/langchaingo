@@ -28,25 +28,24 @@ func NewOpenAI(opts ...Option) (OpenAI, error) {
 	return o, nil
 }
 
-func ChunkArray(arr []string, chunkSize int) [][]string {
-	var chunks [][]string
+func BatchTexts(arr []string, batchSize int) [][]string {
+	var batches [][]string
 
-	for i := 0; i < len(arr); i += chunkSize {
-		end := i + chunkSize
+	for i := 0; i < len(arr); i += batchSize {
+		end := i + batchSize
 
 		if end > len(arr) {
 			end = len(arr)
 		}
 
-		chunks = append(chunks, arr[i:end])
+		batches = append(batches, arr[i:end])
 	}
 
-	return chunks
+	return batches
 }
 
-// EmbedDocuments creates one vector embedding for each of the texts.
-func (e OpenAI) EmbedDocuments(ctx context.Context, texts []string) ([][]float32, error) {
-	batchedTexts := ChunkArray(
+func (e OpenAI) _EmbedDocuments(ctx context.Context, texts []string) ([][]float32, error) {
+	batchedTexts := embeddings.BatchTexts(
 		embeddings.MaybeRemoveNewLines(texts, e.StripNewLines),
 		e.BatchSize,
 	)
@@ -58,18 +57,35 @@ func (e OpenAI) EmbedDocuments(ctx context.Context, texts []string) ([][]float32
 			return nil, err
 		}
 
-		// textLengths := make([]int, 0, len(texts))
-		// for _, text := range texts {
-		// 	textLengths = append(textLengths, len(text))
-		// }
+		textLengths := make([]int, 0, len(texts))
+		for _, text := range texts {
+			textLengths = append(textLengths, len(text))
+		}
 
-		// combined, err := embeddings.CombineVectors(curTextEmbeddings, textLengths)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		combined, err := embeddings.CombineVectors(curTextEmbeddings, textLengths)
+		if err != nil {
+			return nil, err
+		}
 
-		// emb = append(emb, combined)
+		emb = append(emb, combined)
+	}
 
+	return emb, nil
+}
+
+// EmbedDocuments creates one vector embedding for each of the texts.
+func (e OpenAI) EmbedDocuments(ctx context.Context, texts []string) ([][]float32, error) {
+	batchedTexts := BatchTexts(
+		embeddings.MaybeRemoveNewLines(texts, e.StripNewLines),
+		e.BatchSize,
+	)
+
+	emb := make([][]float32, 0, len(texts))
+	for _, texts := range batchedTexts {
+		curTextEmbeddings, err := e.client.CreateEmbedding(ctx, texts)
+		if err != nil {
+			return nil, err
+		}
 		emb = append(emb, curTextEmbeddings...)
 	}
 
