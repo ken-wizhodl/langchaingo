@@ -51,3 +51,23 @@ func ToRetriever(vectorStore VectorStore, numDocuments int, options ...Option) R
 		options: options,
 	}
 }
+
+type NilEmbedder struct {
+}
+
+func (e NilEmbedder) EmbedDocuments(ctx context.Context, texts []string) ([][]float32, error) {
+	vectors := [][]float32{}
+	for range texts {
+		v := []float32{}
+		// it looks like need 1536 float32 to make qdrant.upsert work
+		for i := 0; i < 1536; i++ {
+			v = append(v, 0.0000001)
+		}
+		vectors = append(vectors, v)
+	}
+	return vectors, nil
+}
+
+func (e NilEmbedder) EmbedQuery(ctx context.Context, text string) ([]float32, error) {
+	return nil, nil
+}

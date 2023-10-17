@@ -58,41 +58,24 @@ func New(ctx context.Context, opts ...Option) (Store, error) {
 	return s, nil
 }
 
-type NilEmbedder struct {
-}
-
-func (e NilEmbedder) EmbedDocuments(ctx context.Context, texts []string) ([][]float32, error) {
-	vectors := [][]float32{}
-	for range texts {
-		v := []float32{}
-		// it looks like need 1536 float32 to make qdrant.upsert work
-		for i := 0; i < 1536; i++ {
-			v = append(v, 0.0000001)
-		}
-		vectors = append(vectors, v)
-	}
-	return vectors, nil
-}
-
-func (e NilEmbedder) EmbedQuery(ctx context.Context, text string) ([]float32, error) {
-	return nil, nil
-}
-
 // AddDocuments creates vector embeddings from the documents using the embedder
 // and upsert the vectors to the pinecone index.
 func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options ...vectorstores.Option) error {
+	opts := s.getOptions(options...)
+	embedder := s.getEmbedder(opts)
+
 	texts := make([]string, 0, len(docs))
 	for _, doc := range docs {
 		texts = append(texts, doc.PageContent)
 	}
 
-	vectors, err := s.embedder.EmbedDocuments(ctx, texts)
+	vectors, err := embedder.EmbedDocuments(ctx, texts)
 	if err != nil {
 		return err
 	}
 
 	// if s.embedder isn't NilEmbedder, then len(vectors) == len(docs)
-	_, isNilEmbedder := s.embedder.(NilEmbedder)
+	_, isNilEmbedder := s.embedder.(vectorstores.NilEmbedder)
 	if !isNilEmbedder && len(vectors) != len(docs) {
 		return ErrEmbedderWrongNumberVectors
 	}
@@ -109,8 +92,9 @@ func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options
 // and queries to find the most similar documents.
 func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments int, options ...vectorstores.Option) ([]schema.Document, error) { //nolint:lll
 	opts := s.getOptions(options...)
+	embedder := s.getEmbedder(opts)
 
-	_, isNilEmbedder := s.embedder.(NilEmbedder)
+	_, isNilEmbedder := embedder.(vectorstores.NilEmbedder)
 	if isNilEmbedder {
 		return nil, ErrEmbedderIsNil
 	}
@@ -156,6 +140,13 @@ func (s Store) getOptions(options ...vectorstores.Option) vectorstores.Options {
 		opt(&opts)
 	}
 	return opts
+}
+
+func (s Store) getEmbedder(options vectorstores.Options) embeddings.Embedder {
+	if options.Embedder != nil {
+		return options.Embedder
+	}
+	return s.embedder
 }
 
 func (s Store) NewMustEqualFilter(key string, values ...string) any {
