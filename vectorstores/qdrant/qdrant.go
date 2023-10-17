@@ -94,10 +94,6 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 	opts := s.getOptions(options...)
 	embedder := s.getEmbedder(opts)
 
-	_, isNilEmbedder := embedder.(vectorstores.NilEmbedder)
-	if isNilEmbedder {
-		return nil, ErrEmbedderIsNil
-	}
 	filters := s.getFilters(opts)
 
 	scoreThreshold, err := s.getScoreThreshold(opts)
@@ -105,7 +101,7 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 		return nil, err
 	}
 
-	vector, err := s.embedder.EmbedQuery(ctx, query)
+	vector, err := embedder.EmbedQuery(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -142,22 +138,30 @@ func (s Store) getOptions(options ...vectorstores.Option) vectorstores.Options {
 	return opts
 }
 
+type FilterMatch struct {
+	Key    string
+	Values []any
+}
+
+func (s Store) NewMustEqualFilter(filters ...FilterMatch) any {
+	must := make([]map[string]any, 0, len(filters))
+	for _, filter := range filters {
+		must = append(must, map[string]any{
+			"key": fmt.Sprintf("%s.%s", s.metadataKey, filter.Key),
+			"match": map[string]any{
+				"any": filter.Values,
+			},
+		})
+	}
+
+	return map[string]any{
+		"must": must,
+	}
+}
+
 func (s Store) getEmbedder(options vectorstores.Options) embeddings.Embedder {
 	if options.Embedder != nil {
 		return options.Embedder
 	}
 	return s.embedder
-}
-
-func (s Store) NewMustEqualFilter(key string, values ...string) any {
-	return map[string]any{
-		"must": []any{
-			map[string]any{
-				"key": fmt.Sprintf("%s.%s", s.metadataKey, key),
-				"match": map[string]any{
-					"any": values,
-				},
-			},
-		},
-	}
 }
