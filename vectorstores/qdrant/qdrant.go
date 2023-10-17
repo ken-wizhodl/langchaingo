@@ -19,6 +19,7 @@ var (
 	ErrEmbedderWrongNumberVectors = errors.New(
 		"number of vectors from embedder does not match number of documents",
 	)
+	ErrEmbedderIsNil = errors.New("embedder is NilEmbedder")
 	// ErrEmptyResponse is returned if the API gives an empty response.
 	ErrEmptyResponse         = errors.New("empty response")
 	ErrInvalidScoreThreshold = errors.New(
@@ -57,6 +58,26 @@ func New(ctx context.Context, opts ...Option) (Store, error) {
 	return s, nil
 }
 
+type NilEmbedder struct {
+}
+
+func (e NilEmbedder) EmbedDocuments(ctx context.Context, texts []string) ([][]float32, error) {
+	vectors := [][]float32{}
+	for range texts {
+		v := []float32{}
+		// it looks like need 1536 float32 to make qdrant.upsert work
+		for i := 0; i < 1536; i++ {
+			v = append(v, 0.0000001)
+		}
+		vectors = append(vectors, v)
+	}
+	return vectors, nil
+}
+
+func (e NilEmbedder) EmbedQuery(ctx context.Context, text string) ([]float32, error) {
+	return nil, nil
+}
+
 // AddDocuments creates vector embeddings from the documents using the embedder
 // and upsert the vectors to the pinecone index.
 func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options ...vectorstores.Option) error {
@@ -70,7 +91,9 @@ func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options
 		return err
 	}
 
-	if len(vectors) != len(docs) {
+	// if s.embedder isn't NilEmbedder, then len(vectors) == len(docs)
+	_, isNilEmbedder := s.embedder.(NilEmbedder)
+	if !isNilEmbedder && len(vectors) != len(docs) {
 		return ErrEmbedderWrongNumberVectors
 	}
 
@@ -87,6 +110,10 @@ func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options
 func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments int, options ...vectorstores.Option) ([]schema.Document, error) { //nolint:lll
 	opts := s.getOptions(options...)
 
+	_, isNilEmbedder := s.embedder.(NilEmbedder)
+	if isNilEmbedder {
+		return nil, ErrEmbedderIsNil
+	}
 	filters := s.getFilters(opts)
 
 	scoreThreshold, err := s.getScoreThreshold(opts)
