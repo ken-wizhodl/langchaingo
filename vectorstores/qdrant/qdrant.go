@@ -19,6 +19,7 @@ var (
 	ErrEmbedderWrongNumberVectors = errors.New(
 		"number of vectors from embedder does not match number of documents",
 	)
+	ErrEmbedderIsNil = errors.New("embedder is NilEmbedder")
 	// ErrEmptyResponse is returned if the API gives an empty response.
 	ErrEmptyResponse         = errors.New("empty response")
 	ErrInvalidScoreThreshold = errors.New(
@@ -60,17 +61,22 @@ func New(ctx context.Context, opts ...Option) (Store, error) {
 // AddDocuments creates vector embeddings from the documents using the embedder
 // and upsert the vectors to the pinecone index.
 func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options ...vectorstores.Option) error {
+	opts := s.getOptions(options...)
+	embedder := s.getEmbedder(opts)
+
 	texts := make([]string, 0, len(docs))
 	for _, doc := range docs {
 		texts = append(texts, doc.PageContent)
 	}
 
-	vectors, err := s.embedder.EmbedDocuments(ctx, texts)
+	vectors, err := embedder.EmbedDocuments(ctx, texts)
 	if err != nil {
 		return err
 	}
 
-	if len(vectors) != len(docs) {
+	// if s.embedder isn't NilEmbedder, then len(vectors) == len(docs)
+	_, isNilEmbedder := s.embedder.(vectorstores.NilEmbedder)
+	if !isNilEmbedder && len(vectors) != len(docs) {
 		return ErrEmbedderWrongNumberVectors
 	}
 
@@ -86,6 +92,7 @@ func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options
 // and queries to find the most similar documents.
 func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments int, options ...vectorstores.Option) ([]schema.Document, error) { //nolint:lll
 	opts := s.getOptions(options...)
+	embedder := s.getEmbedder(opts)
 
 	filters := s.getFilters(opts)
 
@@ -94,7 +101,7 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 		return nil, err
 	}
 
-	vector, err := s.embedder.EmbedQuery(ctx, query)
+	vector, err := embedder.EmbedQuery(ctx, query)
 	if err != nil {
 		return nil, err
 	}
@@ -150,4 +157,11 @@ func (s Store) NewMustEqualFilter(filters ...FilterMatch) any {
 	return map[string]any{
 		"must": must,
 	}
+}
+
+func (s Store) getEmbedder(options vectorstores.Options) embeddings.Embedder {
+	if options.Embedder != nil {
+		return options.Embedder
+	}
+	return s.embedder
 }
