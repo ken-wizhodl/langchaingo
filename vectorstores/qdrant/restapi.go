@@ -84,6 +84,30 @@ func (s Store) restUpsert(
 	return newAPIError("upserting vectors", body)
 }
 
+func (s Store) restDeletePoints(ctx context.Context, collection string, filter any) error {
+	payload := map[string]any{
+		"filter": filter,
+	}
+	endpoint := getEndpoint(s.baseURL, collection, "/points/delete")
+	body, statusCode, err := doRequest(
+		ctx,
+		payload,
+		endpoint,
+		s.apiKey,
+		http.MethodPost,
+	)
+	if err != nil {
+		return err
+	}
+	defer body.Close()
+
+	if statusCode == http.StatusOK {
+		return nil
+	} else {
+		return newAPIError("deleting points", body)
+	}
+}
+
 type scoredPoint struct {
 	ID      string         `json:"id"`
 	Version int            `json:"version"`

@@ -110,6 +110,13 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 		filters)
 }
 
+// DeleteDocuments deletes the documents
+func (s Store) DeleteDocuments(ctx context.Context, options ...vectorstores.Option) error {
+	opts := s.getOptions(options...)
+	filters := s.getFilters(opts)
+	return s.restDeletePoints(ctx, s.collectionName, filters)
+}
+
 // Close closes the grpc connection.
 func (s Store) Close() error {
 	return nil
