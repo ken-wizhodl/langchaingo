@@ -85,7 +85,20 @@ func (s Store) AddDocuments(ctx context.Context, docs []schema.Document, options
 		metadatas = append(metadatas, docs[i].Metadata)
 	}
 
-	return s.restUpsert(ctx, texts, vectors, metadatas, s.collectionName)
+	// 上传接口有大小限制，需分批上传
+	batchSize := 500
+	for i := 0; i < len(docs); i += batchSize {
+		end := i + batchSize
+		if end > len(docs) {
+			end = len(docs)
+		}
+		err = s.restUpsert(ctx, texts[i:end], vectors[i:end], metadatas[i:end], s.collectionName)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // SimilaritySearch creates a vector embedding from the query using the embedder
