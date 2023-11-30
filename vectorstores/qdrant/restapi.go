@@ -53,10 +53,14 @@ func (s Store) restUpsert(
 ) error {
 	v := make([]point, 0, len(vectors))
 	for i := 0; i < len(vectors); i++ {
+		ID := uuid.New().String()
+		if metadatas[i] != nil && metadatas[i]["__point_id"] != nil {
+			ID = metadatas[i]["__point_id"].(string)
+		}
 		v = append(v, point{
 			Vector:  vectors[i],
 			Payload: map[string]any{s.contentKey: texts[i], s.metadataKey: metadatas[i]},
-			ID:      uuid.New().String(),
+			ID:      ID,
 		})
 	}
 
