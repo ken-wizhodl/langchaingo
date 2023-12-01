@@ -255,6 +255,76 @@ func (s Store) restQuery(
 	return docs, nil
 }
 
+type scrollResult struct {
+	Points         []point `json:"points"`
+	NextPageOffset *string `json:"next_page_offset"`
+}
+
+type scrollResponse struct {
+	Time   float32       `json:"time"`
+	Status string        `json:"status"`
+	Result *scrollResult `json:"result"`
+}
+
+type ScrollPointsRequest struct {
+	Offset      string `json:"offset,omitempty"`
+	Limit       int    `json:"limit"`
+	Filter      any    `json:"filter"`
+	WithPayload bool   `json:"with_payload"`
+	WithVector  bool   `json:"with_vector"`
+}
+
+func (s Store) restScrollPoints(ctx context.Context, collection string, req *ScrollPointsRequest) ([]schema.Document, string, error) {
+	endpoint := getEndpoint(s.baseURL, collection, "/points/scroll")
+	body, statusCode, err := doRequest(
+		ctx,
+		req,
+		endpoint,
+		s.apiKey,
+		http.MethodPost,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+	defer body.Close()
+
+	if statusCode != http.StatusOK {
+		return nil, "", newAPIError("scrolling points", body)
+	}
+
+	var response scrollResponse
+
+	decoder := json.NewDecoder(body)
+	err = decoder.Decode(&response)
+	if err != nil {
+		return nil, "", err
+	}
+
+	points := response.Result.Points
+
+	docs := make([]schema.Document, 0, len(points))
+	for _, spoint := range points {
+		pageContent, ok := spoint.Payload[s.contentKey].(string)
+		if !ok {
+			return nil, "", ErrMissingTextKey
+		}
+
+		doc := schema.Document{
+			PageContent: pageContent,
+			Metadata:    spoint.Payload[s.metadataKey].(map[string]any),
+		}
+
+		docs = append(docs, doc)
+	}
+
+	nextOffset := ""
+	if response.Result.NextPageOffset != nil {
+		nextOffset = *response.Result.NextPageOffset
+	}
+
+	return docs, nextOffset, nil
+}
+
 func doRequest(ctx context.Context, payload any, url, apiKey, method string) (io.ReadCloser, int, error) {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {

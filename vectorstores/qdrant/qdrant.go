@@ -123,6 +123,10 @@ func (s Store) SimilaritySearch(ctx context.Context, query string, numDocuments 
 		filters)
 }
 
+func (s Store) ScrollPoints(ctx context.Context, req *ScrollPointsRequest) ([]schema.Document, string, error) {
+	return s.restScrollPoints(ctx, s.collectionName, req)
+}
+
 // DeleteDocuments deletes the documents
 func (s Store) DeleteDocuments(ctx context.Context, options ...vectorstores.Option) error {
 	opts := s.getOptions(options...)
