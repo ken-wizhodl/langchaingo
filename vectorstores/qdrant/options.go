@@ -16,10 +16,11 @@ const (
 )
 
 var _defaultCollectionConfig = map[string]any{
-	"hnsw_config": map[string]any{
-		"payload_m": 16,
-		"m":         0,
-	},
+	// m 值如果设为 0，当 Points 数量过多，会导致搜索结果为空
+	// "hnsw_config": map[string]any{
+	// 	"payload_m": 16,
+	// 	"m":         0,
+	// },
 	"optimizers_config": map[string]any{
 		"memmap_threshold": 10000,
 	},
