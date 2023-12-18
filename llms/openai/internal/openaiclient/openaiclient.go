@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
@@ -102,24 +103,35 @@ func (c *Client) CreateEmbedding(ctx context.Context, r *EmbeddingRequest) ([][]
 		r.Model = defaultEmbeddingModel
 	}
 
-	resp, err := c.createEmbedding(ctx, &embeddingPayload{
-		Model: r.Model,
-		Input: r.Input,
-	})
-	if err != nil {
-		return nil, err
-	}
+	// 如果是 503 的错误，重试 3 次
+	reties := 3
+	for {
+		resp, err := c.createEmbedding(ctx, &embeddingPayload{
+			Model: r.Model,
+			Input: r.Input,
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), "status code: 503") {
+				reties--
+				if reties > 0 {
+					time.Sleep(1 * time.Second)
+					continue
+				}
+			}
+			return nil, err
+		}
 
-	if len(resp.Data) == 0 {
-		return nil, ErrEmptyResponse
-	}
+		if len(resp.Data) == 0 {
+			return nil, ErrEmptyResponse
+		}
 
-	embeddings := make([][]float32, 0)
-	for i := 0; i < len(resp.Data); i++ {
-		embeddings = append(embeddings, resp.Data[i].Embedding)
-	}
+		embeddings := make([][]float32, 0)
+		for i := 0; i < len(resp.Data); i++ {
+			embeddings = append(embeddings, resp.Data[i].Embedding)
+		}
 
-	return embeddings, nil
+		return embeddings, nil
+	}
 }
 
 // CreateChat creates chat request.
